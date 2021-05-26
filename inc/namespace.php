@@ -157,9 +157,9 @@ function before_authenticate_with_sso($username) {
 		return;
 	}
 
-	// $userobj     = new WP_User();
-	// $user        = $userobj->get_data_by('email', $username);
-	$user = get_user_by('email', $username);
+	$userobj     = new WP_User();
+	$user        = $userobj->get_data_by('email', $username);
+	// $user = get_user_by('email', $username);
 
 	if ($user && get_user_meta($user->ID, 'allow_normal_login', true)) {
 		return;
