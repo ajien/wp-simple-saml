@@ -7,6 +7,8 @@ use function HumanMade\SimpleSaml\is_sso_enabled_network_wide;
 
 use OneLogin\Saml2\IdPMetadataParser;
 
+global $wp_roles;
+
 /**
  * Bootstrap config/admin related actions
  *
@@ -136,6 +138,13 @@ function get_sso_settings( $option = null ) {
 		'sso_idp_metadata'      => '',
 	];
 
+	$wp_roles   = wp_roles();
+	$role_names = $wp_roles->get_names();
+
+	foreach ($role_names as $key => $role) {
+		$options['sso_mapped_role_' . $key] = $key;
+	}
+
 	// Network options is used instead if the plugin is activated network-wide
 	if ( is_sso_enabled_network_wide() ) {
 		$options = array_combine( array_keys( $options ), array_map( 'get_site_option', array_keys( $options ), array_values( $options ) ) );
@@ -154,6 +163,9 @@ function get_sso_settings( $option = null ) {
  */
 function settings_fields() {
 
+
+	// var_dump($roles);
+
 	$options = get_sso_settings();
 
 	// Network options is used instead if the plugin is activated network-wide
@@ -166,6 +178,13 @@ function settings_fields() {
 	add_settings_section(
 		'sso_settings',
 		__( 'SSO Configuration', 'wp-simple-saml' ),
+		'__return_false',
+		$settings_section
+	);
+
+	add_settings_section(
+		'sso_role_mapping',
+		__( 'Role Mapping', 'wp-simple-saml' ),
 		'__return_false',
 		$settings_section
 	);
@@ -189,7 +208,7 @@ function settings_fields() {
 		<?php
 	}, $settings_section, 'sso_settings' );
 
-	register_setting( $settings_section, 'sso_sp_base', 'sanitize_url' );
+	register_setting( $settings_section, 'sso_sp_base', 'esc_url_raw' );
 	add_settings_field( 'sso_sp_base', __( 'SSO Base URL', 'wp-simple-saml' ), function () use ( $options ) {
 		$value   = $options['sso_sp_base'];
 		$default = is_sso_enabled_network_wide() ? get_home_url( get_network()->site_id, '/' ) : home_url( '/' );
@@ -230,6 +249,19 @@ function settings_fields() {
 		</select>
 		<?php
 	}, $settings_section, 'sso_settings' );
+
+	global $wp_roles;
+	$roles = $wp_roles->get_names();
+	
+	foreach($roles as $key=>$role)  { 
+		register_setting( $settings_section, 'sso_mapped_role_' . $key );
+		add_settings_field( 'sso_mapped_role_' . $key, __( $role . ' ('.$key.')', 'wp-simple-saml' ), function () use ( $options, $key, $role ) {
+		$value = $options['sso_mapped_role_' . $key];
+	 	?>
+		<input type="text" name="sso_mapped_role_<?php echo $key; ?>" id="sso_mapped_role_<?php echo $key; ?>" value="<?php echo $value ? $value : '';  ?>"/>
+		<?php
+			}, $settings_section, 'sso_role_mapping' ); 
+	}
 
 	register_setting( $settings_section, 'sso_whitelisted_hosts', 'sanitize_text_field' );
 	add_settings_field( 'sso_whitelisted_hosts', __( 'SSO delegation whitelisted hosts', 'wp-simple-saml' ), function () use ( $options ) {
@@ -319,6 +351,7 @@ function network_settings_fields() {
  * @action update_wpmu_options
  */
 function save_network_settings_fields() {
+
 	$nonce = isset( $_POST['network_sso_options_nonce'] ) ? wp_unslash( $_POST['network_sso_options_nonce'] ) : null; // @codingStandardsIgnoreLine
 
 	if ( ! wp_verify_nonce( $nonce, 'network_sso_options' ) ) {
@@ -341,6 +374,15 @@ function save_network_settings_fields() {
 
 	if ( isset( $_POST['sso_role_management'] ) ) { // WPCS input var ok
 		update_site_option( 'sso_role_management', sanitize_text_field( wp_unslash( $_POST['sso_role_management'] ) ) ); // WPCS input var ok
+	}
+
+	global $wp_roles;
+	$role_names = $wp_roles->get_names();
+
+	foreach($role_names as $key => $role) {
+		if (isset($_POST['sso_mapped_role_' . $key])) { // WPCS input var ok
+			update_site_option('sso_mapped_role_' . $key, sanitize_text_field(wp_unslash($_POST['sso_mapped_role_' . $key]))); // WPCS input var ok
+		}
 	}
 
 	if ( isset( $_POST['sso_whitelisted_hosts'] ) ) { // WPCS input var ok
