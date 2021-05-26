@@ -42,7 +42,7 @@ function bootstrap() {
 	add_action( 'init', __NAMESPACE__ . '\\rewrites' );
 	add_action( 'template_redirect', __NAMESPACE__ . '\\endpoint', 9 );
 	add_action( 'login_message', __NAMESPACE__ . '\\login_form_link' );
-	add_action( 'wp_authenticate', __NAMESPACE__ . '\\authenticate_with_sso' );
+	add_action( 'wp_authenticate', __NAMESPACE__ . '\\before_authenticate_with_sso' );
 	add_action( 'wp_logout', __NAMESPACE__ . '\\go_home' );
 
 	add_action( 'wpsimplesaml_action_login', __NAMESPACE__ . '\\cross_site_sso' );
@@ -150,8 +150,28 @@ function login_form_link() {
  *
  * @action wp_authenticate
  */
+
+
+function before_authenticate_with_sso($username) {
+	if (!username_exists($username)) {
+		return;
+	}
+
+	// $userobj     = new WP_User();
+	// $user        = $userobj->get_data_by('email', $username);
+	$user = get_user_by('email', $username);
+
+	if ($user && get_user_meta($user->ID, 'allow_normal_login', true)) {
+		return;
+	} else {
+		authenticate_with_sso();
+	}
+
+}
+
 function authenticate_with_sso() {
 	/**
+	 * 
 	 * Filters whether the plugin should force SSO redirection
 	 *
 	 * @return bool Forces SSO authentication if true, defaults to True
